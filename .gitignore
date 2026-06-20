@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Modèles Deep Learning
+*.pth
+
+# Datasets
+data/
+notebooks/data/
+
+# Résultats
+optimization_results/
+
+# Archives
+*.tar.gz

@@ -1,0 +1,12 @@
+{
+    "cnn": {
+        "best_val_acc": 0.518,
+        "test_acc": 0.474,
+        "params": 175658
+    },
+    "mlp": {
+        "best_val_acc": 0.418,
+        "test_acc": 0.443,
+        "params": 1740682
+    }
+}

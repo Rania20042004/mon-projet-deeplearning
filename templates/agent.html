@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="fas fa-robot"></i> Agent d'Optimisation des Hyperparamètres</h4>
+                <p class="mb-0">Recherche automatique des meilleurs paramètres pour vos modèles</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-sliders-h"></i> Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form id="optimizeForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Modèle à optimiser</label>
+                        <select id="modelType" class="form-select">
+                            <option value="cnn">CNN (CIFAR-10)</option>
+                            <option value="hybrid">Hybride CNN+RNN</option>
+                            <option value="mlp">MLP (Cancer)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Ollama executable (local)</label>
+                        <div class="input-group">
+                            <input type="text" id="ollamaPath" class="form-control" placeholder="ollama" value="ollama">
+                            <button id="testOllamaBtn" class="btn btn-outline-secondary">Tester Ollama</button>
+                        </div>
+                        <small class="text-muted">Chemin vers l'exécutable Ollama pour les requêtes locales</small>
+                        <div id="ollamaStatus" class="mt-2 small"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Project Path (pour Ollama)</label>
+                        <div class="input-group">
+                            <input type="text" id="ollamaProjectPath" class="form-control" placeholder="C:\\path\\to\\project" value="{{ request.script_root or '' }}">
+                            <button id="launchOllamaBtn" class="btn btn-success">Lancer Ollama</button>
+                            <button id="stopOllamaBtn" class="btn btn-danger">Arrêter Ollama</button>
+                        </div>
+                        <small class="text-muted">Spécifiez le chemin du projet à ouvrir avec Ollama (le dossier contenant vos modèles/projets).</small>
+                        <div id="ollamaLaunchStatus" class="mt-2 small"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Chat Ollama</label>
+                        <textarea id="ollamaPrompt" class="form-control" rows="3" placeholder="Pose une question à Ollama..."></textarea>
+                        <div class="d-flex gap-2 mt-2">
+                            <input type="text" id="ollamaModel" class="form-control" placeholder="model name (optional)">
+                            <button id="sendOllamaBtn" class="btn btn-primary">Envoyer</button>
+                        </div>
+                        <div id="ollamaChatResult" class="mt-2 small"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Méthode de recherche</label>
+                        <select id="searchMethod" class="form-select">
+                            <option value="random">Recherche aléatoire</option>
+                            <option value="grid">Grid Search</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nombre d'essais</label>
+                        <input type="number" id="nTrials" class="form-control" value="5" min="2" max="20">
+                        <small class="text-muted">Plus il y a d'essais, plus la recherche est longue</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Époques par essai</label>
+                        <input type="number" id="epochs" class="form-control" value="2" min="1" max="5">
+                        <small class="text-muted">Plus il y a d'époques, plus l'entraînement est précis mais long</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100" id="optimizeBtn">
+                        <i class="fas fa-play"></i> Lancer l'optimisation
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-search"></i> Recherche de Learning Rate</h5>
+            </div>
+            <div class="card-body">
+                <button id="findLrBtn" class="btn btn-warning w-100">
+                    <i class="fas fa-chart-line"></i> Trouver le meilleur learning rate
+                </button>
+                <div id="lrResult" class="mt-2"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Résultats</h5>
+            </div>
+            <div class="card-body">
+                <div id="agentResult">
+                    <p class="text-muted"><i class="fas fa-hourglass-half"></i> En attente d'optimisation...</p>
+                </div>
+                <div id="progressBar" class="progress mt-3" style="display:none; height: 25px;">
+                    <div id="progressBarFill" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%">0%</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Comment ça marche</h5>
+            </div>
+            <div class="card-body">
+                <p>L'agent teste différentes combinaisons d'hyperparamètres :</p>
+                <ul>
+                    <li><strong>Grid Search</strong> : Teste toutes les combinaisons</li>
+                    <li><strong>Random Search</strong> : Teste des combinaisons aléatoires</li>
+                </ul>
+                <p class="small text-muted">
+                    <i class="fas fa-info-circle"></i> Chaque combinaison est entraînée sur un sous-ensemble des données pour être plus rapide.
+                </p>
+                <div class="alert alert-warning small">
+                    <i class="fas fa-clock"></i> L'optimisation peut prendre plusieurs minutes selon le nombre d'essais.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $('#optimizeForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const data = {
+            model_type: $('#modelType').val(),
+            search_method: $('#searchMethod').val(),
+            n_trials: parseInt($('#nTrials').val()),
+            epochs: parseInt($('#epochs').val())
+        };
+        
+        const resultDiv = $('#agentResult');
+        const progressBar = $('#progressBar');
+        const progressFill = $('#progressBarFill');
+        
+        resultDiv.html('<div class="spinner-border text-primary"></div><p>Optimisation en cours... Cela peut prendre quelques minutes.</p>');
+        progressBar.show();
+        progressFill.css('width', '0%').text('0%');
+        $('#optimizeBtn').prop('disabled', true);
+        
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 5;
+            if (progress > 90) progress = 90;
+            progressFill.css('width', progress + '%').text(progress + '%');
+        }, 1000);
+        
+        $.ajax({
+            url: '/api/agent/optimize',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                clearInterval(interval);
+                progressFill.css('width', '100%').text('100%');
+                
+                let html = `
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-trophy"></i> Optimisation terminée !</h5>
+                        <p><strong>Meilleur score:</strong> ${(response.best_score * 100).toFixed(2)}%</p>
+                        <p><strong>Nombre d'essais:</strong> ${response.n_trials}</p>
+                        <p><strong>Méthode:</strong> ${response.search_method}</p>
+                    </div>
+                    <div class="mt-3">
+                        <h6>Meilleurs paramètres:</h6>
+                        <ul class="list-group">
+                `;
+                
+                if (response.best_params) {
+                    for (const [key, value] of Object.entries(response.best_params)) {
+                        let displayValue = value;
+                        if (Array.isArray(value)) {
+                            displayValue = '[' + value.join(', ') + ']';
+                        }
+                        html += `<li class="list-group-item d-flex justify-content-between">
+                                    <span>${key}</span>
+                                    <span class="badge bg-primary">${displayValue}</span>
+                                 </li>`;
+                    }
+                } else {
+                    html += `<li class="list-group-item text-danger">Aucun paramètre trouvé</li>`;
+                }
+                html += `</ul></div>`;
+                resultDiv.html(html);
+                
+                setTimeout(() => {
+                    progressBar.hide();
+                }, 2000);
+                
+                $('#optimizeBtn').prop('disabled', false);
+            },
+            error: function(xhr) {
+                clearInterval(interval);
+                console.error('Erreur:', xhr);
+                resultDiv.html('<div class="alert alert-danger">Erreur d\'optimisation. Vérifiez la console pour plus de détails.</div>');
+                progressBar.hide();
+                $('#optimizeBtn').prop('disabled', false);
+            }
+        });
+    });
+    
+    $('#findLrBtn').on('click', function() {
+        const resultDiv = $('#lrResult');
+        resultDiv.html('<div class="spinner-border spinner-border-sm text-warning"></div> Recherche en cours...');
+        $(this).prop('disabled', true);
+        
+        $.ajax({
+            url: '/api/agent/find_lr',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ model_type: $('#modelType').val() }),
+            success: function(response) {
+                resultDiv.html(`
+                    <div class="alert alert-info mt-2">
+                        <strong>Learning rate optimal:</strong> ${response.best_lr.toFixed(6)}
+                        <br><small>Score associé: ${(response.best_score * 100).toFixed(2)}%</small>
+                    </div>
+                `);
+                $('#findLrBtn').prop('disabled', false);
+            },
+            error: function() {
+                resultDiv.html('<div class="alert alert-danger mt-2">Erreur de recherche</div>');
+                $('#findLrBtn').prop('disabled', false);
+            }
+        });
+    });
+});
+</script>
+<script>
+// Ollama tester
+document.getElementById('testOllamaBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    const path = document.getElementById('ollamaPath').value.trim() || 'ollama';
+    fetch('/api/agent/test_ollama', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path })
+    })
+    .then(response => {
+        if (!response.ok) return response.text().then(text => Promise.reject(new Error(text)));
+        return response.json();
+    })
+    .then(data => {
+        document.getElementById('ollamaStatus').innerText = JSON.stringify(data);
+    })
+    .catch(err => {
+        document.getElementById('ollamaStatus').innerText = 'Error: ' + err.message;
+    });
+});
+</script>
+<script>
+// Launch / Stop Ollama
+document.getElementById('launchOllamaBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    const projectPath = document.getElementById('ollamaProjectPath').value.trim() || '.';
+    const path = document.getElementById('ollamaPath').value.trim() || 'ollama';
+    fetch('/api/agent/launch_ollama', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project_path: projectPath, path: path})})
+    .then(response => {
+        if (!response.ok) return response.text().then(text => Promise.reject(new Error(text)));
+        return response.json();
+    })
+    .then(data => { document.getElementById('ollamaLaunchStatus').innerText = JSON.stringify(data); })
+    .catch(err => { document.getElementById('ollamaLaunchStatus').innerText = 'Error: ' + err.message; });
+});
+
+document.getElementById('stopOllamaBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    const projectPath = document.getElementById('ollamaProjectPath').value.trim() || '.';
+    fetch('/api/agent/stop_ollama', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project_path: projectPath})})
+    .then(r => r.json())
+    .then(data => { document.getElementById('ollamaLaunchStatus').innerText = JSON.stringify(data); })
+    .catch(err => { document.getElementById('ollamaLaunchStatus').innerText = 'Error: ' + err; });
+});
+
+// Chat with Ollama (one-shot run)
+document.getElementById('sendOllamaBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    const prompt = document.getElementById('ollamaPrompt').value.trim();
+    const model = document.getElementById('ollamaModel').value.trim() || null;
+    const projectPath = document.getElementById('ollamaProjectPath').value.trim() || '.';
+    const path = document.getElementById('ollamaPath').value.trim() || 'ollama';
+    if (!prompt) { document.getElementById('ollamaChatResult').innerText = 'Entrez un prompt.'; return; }
+    fetch('/api/agent/ollama_chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({prompt: prompt, model: model, project_path: projectPath, path: path})})
+    .then(response => {
+        if (!response.ok) return response.text().then(text => Promise.reject(new Error(text)));
+        return response.json();
+    })
+    .then(data => {
+        if (data.output) {
+            document.getElementById('ollamaChatResult').innerText = data.output;
+        } else if (data.stderr) {
+            document.getElementById('ollamaChatResult').innerText = 'Error: ' + data.stderr;
+        } else {
+            document.getElementById('ollamaChatResult').innerText = JSON.stringify(data);
+        }
+    })
+    .catch(err => { document.getElementById('ollamaChatResult').innerText = 'Error: ' + err.message; });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="fas fa-table"></i> Matrice de Corrélation - Cancer du sein</h4>
+                <p class="mb-0">Analyse des relations entre les 30 caractéristiques</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center">
+                <img src="{{ url_for('static', filename='correlation_analysis.png') }}" 
+                     alt="Matrice de corrélation" class="img-fluid">
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-arrow-up"></i> Corrélations positives</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for feature, corr in top_positive.items() %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ feature }}</span>
+                        <span class="badge bg-success">{{ "%.2f"|format(corr) }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-arrow-down"></i> Corrélations négatives</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for feature, corr in top_negative.items() %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ feature }}</span>
+                        <span class="badge bg-danger">{{ "%.2f"|format(corr) }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Interprétation</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Corrélation positive</strong> : Les valeurs augmentent ensemble</p>
+                <p><strong>Corrélation négative</strong> : Quand l'une augmente, l'autre diminue</p>
+                <hr>
+                <p class="small text-muted">
+                    Les features les plus corrélées avec le cancer sont les plus importantes pour la classification.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="fas fa-language"></i> Traduction Français → Anglais</h4>
+                <p class="mb-0">Architecture Seq2Seq avec encodeur-décodeur GRU</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4 justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-france"></i> Français :
+                    </label>
+                    <textarea id="inputText" class="form-control" rows="3" 
+                              placeholder="Exemples: bonjour, au revoir, merci, comment allez vous"></textarea>
+                </div>
+                
+                <div class="text-center mb-4">
+                    <button id="translateBtn" class="btn btn-primary btn-lg">
+                        <i class="fas fa-exchange-alt"></i> Traduire
+                    </button>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-great-britain"></i> Anglais :
+                    </label>
+                    <textarea id="outputText" class="form-control" rows="3" readonly 
+                              placeholder="La traduction apparaîtra ici..."></textarea>
+                </div>
+                
+                <div id="loading" class="text-center" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Traduction...</span>
+                    </div>
+                    <p>Traduction en cours...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Exemples</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2 example-btn" data-text="bonjour">
+                            <i class="fas fa-smile"></i> bonjour
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2 example-btn" data-text="au revoir">
+                            <i class="fas fa-hand-peace"></i> au revoir
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2 example-btn" data-text="merci">
+                            <i class="fas fa-heart"></i> merci
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2 example-btn" data-text="comment allez vous">
+                            <i class="fas fa-question"></i> comment allez vous
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2 example-btn" data-text="je vais bien">
+                            <i class="fas fa-thumbs-up"></i> je vais bien
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm w-100 mb-2 example-btn" data-text="bonjour tout le monde">
+                            <i class="fas fa-globe"></i> bonjour tout le monde
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-microchip"></i> Architecture du modèle</h5>
+            </div>
+            <div class="card-body">
+                <ul>
+                    <li><strong>Encodeur GRU</strong> : Lit la phrase française et crée un vecteur de contexte</li>
+                    <li><strong>Décodeur GRU</strong> : Génère mot par mot la traduction anglaise</li>
+                    <li><strong>Vocabulaire</strong> : Phrases courtes pour la démonstration</li>
+                </ul>
+                <p class="small text-muted mt-2">
+                    <i class="fas fa-info-circle"></i> Note: Modèle entraîné sur un corpus limité de démonstration.
+                    Pour de meilleurs résultats, entraînez sur plus de données.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Attendre que le DOM soit complètement chargé
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Élément du bouton traduire
+    const translateBtn = document.getElementById('translateBtn');
+    const inputText = document.getElementById('inputText');
+    const outputText = document.getElementById('outputText');
+    const loading = document.getElementById('loading');
+    
+    // Fonction de traduction
+    function translateText() {
+        const sentence = inputText.value.trim();
+        
+        if (!sentence) {
+            alert('Veuillez entrer une phrase en français');
+            return;
+        }
+        
+        // Afficher le chargement
+        loading.style.display = 'block';
+        translateBtn.disabled = true;
+        outputText.value = '';
+        
+        // Appel API
+        fetch('/translate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ sentence: sentence })
+        })
+        .then(response => response.json())
+        .then(data => {
+            outputText.value = data.translation;
+            loading.style.display = 'none';
+            translateBtn.disabled = false;
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            outputText.value = '❌ Erreur de connexion. Veuillez réessayer.';
+            loading.style.display = 'none';
+            translateBtn.disabled = false;
+        });
+    }
+    
+    // Événement au clic
+    translateBtn.addEventListener('click', translateText);
+    
+    // Exemples
+    const exampleBtns = document.querySelectorAll('.example-btn');
+    exampleBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            inputText.value = this.getAttribute('data-text');
+            translateText();
+        });
+    });
+    
+    // Entrée clavier (Ctrl+Enter ou Shift+Enter)
+    inputText.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.shiftKey) && e.key === 'Enter') {
+            e.preventDefault();
+            translateText();
+        }
+    });
+});
+</script>
+{% endblock %}
